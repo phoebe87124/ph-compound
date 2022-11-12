@@ -1,13 +1,21 @@
-# Sample Hardhat Project
+# Installation
+```
+npm install --save-dev hardhat
+npx hardhat
+```
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a script that deploys that contract.
-
-Try running some of the following tasks:
-
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
+# How to Use
+## Step 1: Run Node
+```
 npx hardhat node
-npx hardhat run scripts/deploy.js
+```
+### Step 2: Run Test
+Run mintAndRedeem
+```
+npx hardhat test test/mintAndRedeem.js
+```
+
+Run borrow
+```
+npx hardhat test test/borrow.js
 ```
