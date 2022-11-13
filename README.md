@@ -10,14 +10,23 @@ npx hardhat
 npx hardhat node
 ```
 ## Step 2: Run Test
-Run mintAndRedeem
+Run mint and redeem
 ```
 npx hardhat test test/mintAndRedeem.js
 ```
 
-Run borrow
+Run borrow and liquidate
 ```
 npx hardhat test test/borrow.js
+```
+
+Run borrow and liquidate with flashloan
+```
+// set api key in .env
+API_KEY = xxxxxx
+
+// run script
+npx hardhat test test/flashloan
 ```
 
 ## Run Test with Gas Report
