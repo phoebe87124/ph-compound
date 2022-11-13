@@ -1,6 +1,5 @@
 const { expect } = require('chai');
 const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
-const hre = require("hardhat");
 const UNI_ABI = require("../abi/uni");
 const USDC_ABI = require("../abi/usdc");
 
@@ -17,7 +16,6 @@ describe("Week12", function(){
   const LIQUIDATION_INCENTIVE = ethers.utils.parseUnits("1.1", 18)
   const UNI_PRICE = ethers.utils.parseUnits("10", 18)
   const USDC_PRICE = ethers.utils.parseUnits("1", 18 + 12)
-  const MANTISSA = 10 ** 18
 
   const DEPOSIT_UNI_AMOUNT = ethers.utils.parseUnits("1000", 18)
   const BORROW_USDC_AMOUNT = ethers.utils.parseUnits("5000", 6)
@@ -122,12 +120,8 @@ describe("Week12", function(){
   }
 
   describe("use AAVE's flash loan to liquidate user1", function(){
-    // 將 UNI 價格改為 $6.2 使 User1 產生 Shortfall，並讓 User2 透過 AAVE 的 Flash loan 來清算 User1
-    // 可以自行檢查清算 50% 後是不是大約可以賺 121 USD
-    // 在合約中如需將 UNI 換成 USDC 可以使用以下程式碼片段：
     var COMTROLLER, SIMPLE_PRICE_ORACLE, UNI, CUNI, USDC, CUSDC, LENDING_POOL, FLASHLOAN, OWNER, USER1, USER2
     before(async () => {
-      console.log('================ before each ================')
       const { comptroller, simplePriceOracle, uni, cUNI, usdc, cUSDC, lendingPool, flashloan, owner, user1, user2 } = await loadFixture(setup);
       const binanceSigner = await ethers.getImpersonatedSigner(BINANCE_WALLET)
 
@@ -166,12 +160,6 @@ describe("Week12", function(){
         [user2.address],
         [TRANSFER_AMOUNT_USDC]
       );
-
-
-      // ============================ aave ============================
-      // deposit 10000 USDC to aave pool
-      await usdc.approve(lendingPool.address, TRANSFER_AMOUNT_USDC)
-      await usdc.approve(flashloan.address, TRANSFER_AMOUNT_USDC)
 
       UNI = uni
       CUNI = cUNI
@@ -230,143 +218,21 @@ describe("Week12", function(){
     })
 
     it ("liquidate with flash loan", async function(){
-      console.log('await USDC.balanceOf(USER2.address)', await USDC.balanceOf(USER2.address))
-      console.log('await USDC.balanceOf(LENDING_POOL.address)', await USDC.balanceOf(LENDING_POOL.address))
-      // console.log('LENDING_POOL', LENDING_POOL)
-      await USDC.connect(USER2).transfer(FLASHLOAN.address, ethers.utils.parseUnits("100", 6))
-      console.log('await USDC.balanceOf(FLASHLOAN.address)', await USDC.balanceOf(FLASHLOAN.address))
-      console.log('CUSDC.address', CUSDC.address)
-      console.log('CUNI.address', CUNI.address)
       const abiCoder = new ethers.utils.AbiCoder()
+      // [user2] use flashloan to liquidate
       await expect(FLASHLOAN.connect(USER2).requestFlashloan(
         USDC_ADDRESS, // assets
         BORROW_USDC_AMOUNT * 0.5, // amounts
-        abiCoder.encode(
+        abiCoder.encode( // encoded params
           ['address', 'address', 'address', 'address', 'address'],
           [CUSDC.address, USER1.address, CUNI.address, UNI_ADDRESS, SWAP_ADDRESS],
         ),
       ))
       .to.emit(LENDING_POOL, "FlashLoan")
+
+      // flashloan profit > 0
+      expect(await USDC.balanceOf(FLASHLOAN.address))
+      .to.above(ethers.utils.parseUnits("0", 6))
     })
-
-    // it ("check liquidate result", async function(){
-    //   // [user2] approve cUSDC to use USDC for liquidating
-    //   await USDC.connect(USER2).approve(CUSDC.address, ethers.utils.parseUnits("1000000", 6))
-
-    //   // [user2] liquidate user1
-    //   await expect(CUSDC.connect(USER2).liquidateBorrow(USER1.address, BORROW_USDC_AMOUNT * 0.5, CUNI.address))
-    //   .to.emit(CUSDC, "LiquidateBorrow")
-
-    //   // [user2] liquidate user1 => repay 2500 USDC and get cUNI
-    //   expect(await USDC.balanceOf(USER2.address))
-    //   .to.equal(ethers.utils.parseUnits("17500", 6))
-    
-    //   expect(await CUNI.balanceOf(USER2.address))
-    //   .to.above(ethers.utils.parseUnits("0", 18))
-    //   // get 431.12903225806457 cUNI
-    // })
   })
-
-  
-
-  // it ("[owner] mint 10000 erc20 to cErc20", async function(){
-  //   const [owner, user] = await ethers.getSigners();
-
-  
-
-  
-
-  // it ("[owner] set phToken & pUSD's oracle price", async function(){
-  //   // 在 Oracle 中設定一顆 token A 的價格為 $1，一顆 token B 的價格為 $100
-  //   // await expect(simplePriceOracle.setDirectPrice(erc20.address, 100))
-  //   // .to.emit(simplePriceOracle, "PricePosted")
-  //   // .withArgs(erc20.address, 0, 100, 100)
-
-  //   // await expect(simplePriceOracle.setDirectPrice(pUsd.address, 1))
-  //   // .to.emit(simplePriceOracle, "PricePosted")
-  //   // .withArgs(pUsd.address, 0, 1, 1)
-    
-  
-  // })
-
-
-
-  // it ("[user1] use 1 phToken to mint cPH", async function(){
-  //   const [owner, user1] = await ethers.getSigners();
-
-  //   // [owner] send user 10000 erc20
-  //   await erc20.transfer(user1.address, ethers.utils.parseUnits("10000", 18))
-
-  
-  // })
-
-  // it ("[user1] use token B as collateral to borrow 50 token A", async function(){
-  //   // User1 使用 token B 作為抵押品來借出 50 顆 token A
-  //   const [owner, user1] = await ethers.getSigners();
-
-  //   // [owner] list pUsd in market
-  //   await expect(comptroller._supportMarket(cPUSD.address))
-  //   .to.emit(comptroller, "MarketListed")
-  //   .withArgs(cPUSD.address)
-
-  //   // [owner] deposit 10000 token A
-  //   await pUsd.approve(cPUSD.address, ethers.utils.parseUnits("1000000", 18))
-  //   await cPUSD.mint(ethers.utils.parseUnits("10000", 18));
-  //   expect(await cPUSD.totalSupply())
-  //   .to.equal(ethers.utils.parseUnits("10000", 18))
-
-  
-    
-  
-
-  //   expect(await pUsd.balanceOf(user1.address))
-  //   .to.equal(ethers.utils.parseUnits("50", 18))
-
-  
-
-  // // it ("[owner] update phToken's collateral factor to 40%", async function(){
-  // //   const [owner, user1] = await ethers.getSigners();
-
-  // //   // 調整 token B 的 collateral factor，讓 user1 被 user2 清算
-  // //   await expect(comptroller._setCollateralFactor(cErc20.address, ethers.utils.parseUnits("0.4", 18)))
-  // //   .to.emit(comptroller, "NewCollateralFactor")
-  // //   .withArgs(cErc20.address, ethers.utils.parseUnits("0.5", 18), ethers.utils.parseUnits("0.4", 18))
-
-  // //   // [user1] can be liquidated => shortfail > 0
-  // //   let accountLiquidity = await comptroller.getAccountLiquidity(user1.address)
-  // //   expect(accountLiquidity[2])
-  // //   .to.above(ethers.utils.parseUnits("0", 0))
-  // // })
-
-  // it ("[owner] update phToken's price to 90", async function(){
-  //   const [owner, user1] = await ethers.getSigners();
-
-  
-  // })
-
-  // it ("[user2] liquidate user1's assets", async function(){
-  //   // 調整 token B 的 collateral factor，讓 user1 被 user2 清算
-  //   const [owner, user1, user2] = await ethers.getSigners();
-
-  
-
-  
-
-  
-
-  
-  // })
 })
-
-
-// V Fork Ethereum mainnet at block 15815693 (Reference)
-// V cToken 的 decimals 皆為 18，初始 exchangeRate 為 1:1
-// V Close factor 設定為 50%
-// V Liquidation incentive 設為 10%（1.1 * 1e18)
-// 使用 USDC 以及 UNI 代幣來作為 token A 以及 Token B
-// V 在 Oracle 中設定 USDC 的價格為 $1，UNI 的價格為 $10
-// V 設定 UNI 的 collateral factor 為 50%
-// V User1 使用 1000 顆 UNI 作為抵押品借出 5000 顆 USDC
-// 將 UNI 價格改為 $6.2 使 User1 產生 Shortfall，並讓 User2 透過 AAVE 的 Flash loan 來清算 User1
-// 可以自行檢查清算 50% 後是不是大約可以賺 121 USD
-// 在合約中如需將 UNI 換成 USDC 可以使用以下程式碼片段：

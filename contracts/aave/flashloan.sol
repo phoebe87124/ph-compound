@@ -6,7 +6,6 @@ import "./interfaces/ILendingPool.sol";
 import {Ownable} from '@openzeppelin/contracts/access/Ownable.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {CErc20} from '../CErc20.sol';
-import "hardhat/console.sol";
 // uniswap related
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
@@ -21,13 +20,14 @@ contract Flashloan is FlashLoanReceiverBase, Ownable {
       address initiator,
       bytes calldata params
     ) external override returns (bool){
-      // custom logic with funds
+      // any logic with funds
+
       uint amountOwed = amounts[0] + premiums[0];
       IERC20 TOKEN = IERC20(assets[0]);
       TOKEN.approve(address(LENDING_POOL), amountOwed);
 
-      // liquidate logic
-      // get liquidate params
+      // ==================== liquidate logic ====================
+      // get compound liquidate params
       (
         address cTokenAddress,
         address borrower,
@@ -47,44 +47,33 @@ contract Flashloan is FlashLoanReceiverBase, Ownable {
         // swap cUNI to UNI
         cTOKEN.redeem(cTOKEN.balanceOf(address(this)));
       }
-
-
+    
       uint uniAmount = IERC20(seizeUnderlyingTokenAddress).balanceOf(address(this));
-      console.log('uniAmount %s', uniAmount);
-
-      console.log('seizeUnderlyingTokenAddress, %s', seizeUnderlyingTokenAddress);
-      console.log('assets[0], %s', assets[0]);
-
-      // swap UNI to USDC params
-      ISwapRouter.ExactInputSingleParams memory swapParams =
-        ISwapRouter.ExactInputSingleParams({
-          tokenIn: seizeUnderlyingTokenAddress,
-          tokenOut: assets[0],
-          fee: 3000, // 0.3%
-          recipient: address(this),
-          deadline: block.timestamp,
-          amountIn: uniAmount,
-          amountOutMinimum: 0,
-          sqrtPriceLimitX96: 0
-        });
 
       // approve uniswap to use UNI
-      {
-        IERC20(seizeUnderlyingTokenAddress).approve(swapAddress, uniAmount);
-      }
+      IERC20(seizeUnderlyingTokenAddress).approve(swapAddress, uniAmount);
 
-      // The call to `exactInputSingle` executes the swap.
+      // swap UNI to USDC
       {
-        ISwapRouter swapRouter = ISwapRouter(swapAddress);
-        // 0xE592427A0AEce92De3Edee1F18E0157C05861564
-        uint256 amountOut = swapRouter.exactInputSingle(swapParams);
-        console.log('amountOut, %s', amountOut);
+        uint256 amountOut = ISwapRouter(swapAddress).exactInputSingle(
+          ISwapRouter.ExactInputSingleParams({
+            tokenIn: seizeUnderlyingTokenAddress,
+            tokenOut: assets[0],
+            fee: 3000, // 0.3%
+            recipient: address(this),
+            deadline: block.timestamp,
+            amountIn: uniAmount,
+            amountOutMinimum: 0,
+            sqrtPriceLimitX96: 0
+          }
+        ));
+
+        require(amountOut > amountOwed, "unbeneficial transaction");
       }
       return true;
     }
 
     function requestFlashloan(address _token, uint _amount, bytes calldata params) public {
-      console.log('here1');
       address[] memory assets = new address[](1);
       uint256[] memory amounts = new uint256[](1);
       uint256[] memory modes = new uint256[](1);
@@ -95,9 +84,6 @@ contract Flashloan is FlashLoanReceiverBase, Ownable {
       address onBehalfOf = address(this);
       uint16 referralCode = 0;
 
-      console.log('here2');
-      console.log('here2, %s', address(LENDING_POOL));
-      console.logBytes(params);
       IERC20(_token).approve(address(LENDING_POOL), _amount);
       LENDING_POOL.flashLoan(
         receiverAddress,
@@ -108,7 +94,6 @@ contract Flashloan is FlashLoanReceiverBase, Ownable {
         params,
         referralCode
       );
-      console.log('here3');
     }
 
     function getBalance(address _tokenAddress) external view returns (uint256) {
