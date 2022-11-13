@@ -1,8 +1,9 @@
 require("@nomicfoundation/hardhat-toolbox");
+require('dotenv').config();
+require("@nomiclabs/hardhat-ethers");
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  // solidity: "0.8.17",
   solidity: {
     compilers: [
       {
@@ -12,8 +13,17 @@ module.exports = {
             enabled: true,
             runs: 200,
           },
+          viaIR: true,
         },
       },
     ]
+  },
+  networks: {
+    hardhat: {
+      forking: {
+        url: `https://eth-mainnet.g.alchemy.com/v2/${process.env.API_KEY}`,
+        blockNumber: 15815693,
+      }
+    },
   },
 };
